@@ -115,6 +115,26 @@ impl WaterTank {
 	}
 }
 
+pub struct EspressoPress;
+impl EspressoPress {
+	fn ping(timeout: u64) -> Result<(), &'static str> {
+		let rng = thread_rng().gen_range(2..100);
+		thread::sleep(time::Duration::from_millis(rng));
+		if rng > timeout {
+			Err("EspressoPress Component Not Responding")
+		} else {
+			Ok(())
+		}
+	}
+	pub fn press(timeout: u64) -> Result<Ingredient, &'static str> {
+		if let Err(e) = EspressoPress::ping(timeout) {
+			return Err(e)
+		} else {
+			Ok(Ingredient::Espresso)
+		}
+	}
+}
+
 pub struct MilkTank;
 impl MilkTank {
 	fn ping(timeout: u64) -> Result<(), &'static str> {
@@ -139,18 +159,32 @@ impl MilkTank {
 			Err("Not enough milk in MilkTank")
 		}
 	}
-	pub fn dispense(s: Size, timeout: u64) -> Result<Ingredient, &'static str> {
+	pub fn dispense(s: Size, timeout: u64) -> Result<(), &'static str> {
 		if let Err(e) = MilkTank::ping(timeout) {
 			return Err(e);
 		}
 		if let Err(e) = MilkTank::check_tank(s) {
 			return Err(e);
 		}
-		Ok(Ingredient::Milk)
+		Ok(())
 	}
 }
 
 pub struct Frother;
 impl Frother {
-
+	fn ping(timeout: u64) -> Result<(), &'static str> {
+		let rng = thread_rng().gen_range(2..100);
+		thread::sleep(time::Duration::from_millis(rng));
+		if rng > timeout {
+			Err("Frother Component Not Responding")
+		} else {
+			Ok(())
+		}
+	}
+	pub fn froth(timeout: u64) -> Result<Ingredient, &'static str> {
+		if let Err(e) = Frother::ping(timeout) {
+			return Err(e);
+		}
+		Ok(Ingredient::Milk)
+	}
 }
