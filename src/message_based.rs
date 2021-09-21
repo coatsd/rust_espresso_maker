@@ -26,6 +26,7 @@ impl fmt::Display for Cup {
 impl ops::Add<Ingredient> for Cup {
 	type Output = Self;
 
+	// memory inefficient - creates new cup instead of altering current one.
 	fn add(self, i: Ingredient) -> Self {
 		let mut c = self.contents;
 		c.push(i);
@@ -42,7 +43,53 @@ impl Cup {
 			contents: Box::new(Vec::<Ingredient>::new()),	
 		}
 	}
+	fn add_ingredient(mut self, i: Ingredient) {
+		self.contents.push(i);
+	}
 }
 
-// TODO: create modules for the components that check their statuses.
+macro_rules! check_machine {
+	($t_o:expr, $m:ty) => {
+		if let Result::Err(e) = <$m>::ping($t_o) {
+			Err(e)
+		} else {
+			Ok(())
+		}
+	};
+	($t_o:expr, $s:expr, $m:ty) => {
+		if let Result::Err(e) = <$m>::ping($t_o) {
+			Err(e)
+		} else {
+			if let Result::Err(e) = <$m>::check_capacity($s) {
+				Err(e)
+			} else {
+				Ok(())
+			}
+		}
+	};
+}
 
+fn run_checks(t_o: u64, s: Size) -> [Result<(), &'static str>; 5] {
+	[
+		check_machine!(t_o, s, CoffeeHopper),
+		check_machine!(t_o, s, WaterTank),
+		check_machine!(t_o, EspressoPress),
+		check_machine!(t_o, s, MilkTank),
+		check_machine!(t_o, Frother)
+	]
+}
+
+fn message_based_main() {
+	let c = Cup::new(Size::Medium);
+	let mut passed_checks = true;
+	for c in run_checks(100, c.size).iter() {
+		match c {
+			Err(e) => { passed_checks = false; println!("{}", e); },
+			_ => (),
+		}
+	}
+
+	if passed_checks {
+		// do stuff
+	}
+}

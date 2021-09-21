@@ -28,6 +28,7 @@ impl fmt::Display for Ingredient {
 	}
 }
 
+#[derive(Copy, Clone)]
 pub enum Size {
 	Small,
 	Medium,
@@ -44,9 +45,15 @@ impl fmt::Display for Size {
 	}
 }
 
+pub trait Ping {
+	fn ping(timeout: u64) -> Result<(), &'static str>;
+}
+pub trait Capacity {
+	fn check_capacity(s: Size) -> Result<(), &'static str>;
+}
+
 pub struct CoffeeHopper;
-impl CoffeeHopper {
-	// simulate pinging a component to make sure it's connected
+impl Ping for CoffeeHopper {
 	fn ping(timeout: u64) -> Result<(), &'static str> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
@@ -56,7 +63,9 @@ impl CoffeeHopper {
 			Ok(())
 		}
 	}
-	fn check_hopper(s: Size) -> Result<(), &'static str> {
+}
+impl Capacity for CoffeeHopper {
+	fn check_capacity(s: Size) -> Result<(), &'static str> {
 		use Size::*;
 		let s: f32 = match s {
 			Small => 1.0,
@@ -69,19 +78,21 @@ impl CoffeeHopper {
 			Err("Not enough coffee beans in CoffeeHopper")
 		}
 	}
+}
+impl CoffeeHopper {
 	pub fn grind_beans(s: Size, timeout: u64) -> Result<(), &'static str> {
 		if let Err(e) = CoffeeHopper::ping(timeout) {
 			return Err(e);
 		}
-		if let Err(e) = CoffeeHopper::check_hopper(s) {
+		if let Err(e) = CoffeeHopper::check_capacity(s) {
 			return Err(e);
 		}
 		Ok(())
 	}
 }
 
-struct WaterTank;
-impl WaterTank {
+pub struct WaterTank;
+impl Ping for WaterTank {
 	fn ping(timeout: u64) -> Result<(), &'static str> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
@@ -91,7 +102,9 @@ impl WaterTank {
 			Ok(())
 		}
 	}
-	fn check_tank(s: Size) -> Result<(), &'static str> {
+}
+impl Capacity for WaterTank {
+	fn check_capacity(s: Size) -> Result<(), &'static str> {
 		use Size::*;
 		let s: f32 = match s {
 			Small => 1.0,
@@ -104,11 +117,13 @@ impl WaterTank {
 			Err("Not enough water in WaterTank")
 		}
 	}
+}
+impl WaterTank {
 	pub fn dispense(s: Size, timeout: u64) -> Result<(), &'static str> {
 		if let Err(e) = WaterTank::ping(timeout) {
 			return Err(e);
 		}
-		if let Err(e) = WaterTank::check_tank(s) {
+		if let Err(e) = WaterTank::check_capacity(s) {
 			return Err(e);
 		}
 		Ok(())
@@ -116,7 +131,7 @@ impl WaterTank {
 }
 
 pub struct EspressoPress;
-impl EspressoPress {
+impl Ping for EspressoPress {
 	fn ping(timeout: u64) -> Result<(), &'static str> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
@@ -126,6 +141,8 @@ impl EspressoPress {
 			Ok(())
 		}
 	}
+}
+impl EspressoPress {
 	pub fn press(timeout: u64) -> Result<Ingredient, &'static str> {
 		if let Err(e) = EspressoPress::ping(timeout) {
 			return Err(e)
@@ -136,7 +153,7 @@ impl EspressoPress {
 }
 
 pub struct MilkTank;
-impl MilkTank {
+impl Ping for MilkTank {
 	fn ping(timeout: u64) -> Result<(), &'static str> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
@@ -146,7 +163,9 @@ impl MilkTank {
 			Ok(())
 		}
 	}
-	fn check_tank(s: Size) -> Result<(), &'static str> {
+}
+impl Capacity for MilkTank {
+	fn check_capacity(s: Size) -> Result<(), &'static str> {
 		use Size::*;
 		let s: f32 = match s {
 			Small => 7.0,
@@ -159,11 +178,13 @@ impl MilkTank {
 			Err("Not enough milk in MilkTank")
 		}
 	}
+}
+impl MilkTank {
 	pub fn dispense(s: Size, timeout: u64) -> Result<(), &'static str> {
 		if let Err(e) = MilkTank::ping(timeout) {
 			return Err(e);
 		}
-		if let Err(e) = MilkTank::check_tank(s) {
+		if let Err(e) = MilkTank::check_capacity(s) {
 			return Err(e);
 		}
 		Ok(())
@@ -171,7 +192,7 @@ impl MilkTank {
 }
 
 pub struct Frother;
-impl Frother {
+impl Ping for Frother {
 	fn ping(timeout: u64) -> Result<(), &'static str> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
@@ -181,6 +202,8 @@ impl Frother {
 			Ok(())
 		}
 	}
+}
+impl Frother {
 	pub fn froth(timeout: u64) -> Result<Ingredient, &'static str> {
 		if let Err(e) = Frother::ping(timeout) {
 			return Err(e);
