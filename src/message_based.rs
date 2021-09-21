@@ -79,13 +79,13 @@ fn run_checks(t_o: u64, s: Size) -> [Result<(), &'static str>; 5] {
 	]
 }
 
-fn message_based_main() {
+pub fn message_based_main() {
 	let c = Cup::new(Size::Medium);
 	let mut passed_checks = true;
-	for c in run_checks(100, c.size).iter() {
-		match c {
+	for check in run_checks(100, c.size).iter() {
+		match check {
 			Err(e) => { passed_checks = false; println!("{}", e); },
-			_ => (),
+			_ => println!("Passed!"),
 		}
 	}
 
