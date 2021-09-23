@@ -43,7 +43,7 @@ impl Cup {
 			contents: Box::new(Vec::<Ingredient>::new()),	
 		}
 	}
-	fn add_ingredient(mut self, i: Ingredient) {
+	fn add_ingredient(&mut self, i: Ingredient) {
 		self.contents.push(i);
 	}
 }
@@ -79,9 +79,49 @@ fn run_checks(t_o: u64, s: Size) -> [Result<(), &'static str>; 5] {
 	]
 }
 
+fn get_espresso<'a>(timeout: u64, c: &'a mut Cup, c_send: S<&'a mut Cup>) -> Result<(), &'static str> {
+    if let Err(e) = CoffeeHopper::grind_beans(c.size, timeout) {
+        return Err(e)
+    } else {
+        if let Err(e) = WaterTank::dispense(c.size, timeout) {
+            return Err(e)
+        } else {
+            match EspressoPress::press(timeout) {
+                Err(e) => return Err(e),
+                Ok(i) => {
+                    c.add_ingredient(i);
+                    match c_send.send(c) {
+                        Err(e) => { println!("{}", e); return Err("Error in send"); },
+                        _ => println!("Espresso dispensed!"),
+                    }
+                },
+            }
+        }
+    }
+    Ok(())
+}
+
+fn get_milk(timeout: u64, c_recv: R<&mut Cup>) -> Result<(), &'static str> {
+    if let Ok(c) = c_recv.recv() {
+        if let Err(e) = MilkTank::dispense(c.size, timeout) {
+            return Err(e)
+        } else {
+            match Frother::froth(timeout) {
+                Err(e) => return Err(e),
+                Ok(i) => {
+                    c.add_ingredient(i);
+                    println!("Milk dispensed");
+                },
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn message_based_main() {
-	let c = Cup::new(Size::Medium);
+	let mut c = Cup::new(Size::Medium);
 	let mut passed_checks = true;
+    const timeout: u64 = 100;
 	for check in run_checks(100, c.size).iter() {
 		match check {
 			Err(e) => { passed_checks = false; println!("{}", e); },
@@ -90,6 +130,18 @@ pub fn message_based_main() {
 	}
 
 	if passed_checks {
-		// do stuff
+        let (c_send, c_recv) = mpsc::channel::<&mut Cup>();
+        if let Result::Err(e) = thread::spawn(move || {
+            if let Err(e) = get_espresso(timeout, &mut c, c_send) {
+                println!("{}", e);
+            }
+        }).join() {
+            if let Some(e) = e.downcast_ref::<&'static str>() {
+                println!("Thread Error: {}", e);
+            } else {
+                println!("Unknown Thread Error: {:?}", e);
+            }
+        }
+        get_milk(timeout, c_recv);
 	}
 }

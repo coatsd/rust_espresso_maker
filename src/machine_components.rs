@@ -11,8 +11,6 @@ const WATERAMOUNT: f32 = 2.0;
 const MILKAMOUNT: f32 = 10.0;
 // The "capacity" of each hopper or tank.
 const CAPACITY: f32 = 64.0;
-type S<T> = mpsc::Sender<T>;
-type R<T> = mpsc::Receiver<T>;
 
 pub enum Ingredient {
 	Espresso,
