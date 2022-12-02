@@ -1,9 +1,11 @@
 use std::{time, thread};
+use waitgroup::WaitGroup;
 use std::sync::mpsc;
 use std::fmt;
 use std::boxed::Box;
 use std::string::String;
 use std::ops;
+use futures::executor::block_on;
 use crate::machine_components::*;
 
 type S<T> = mpsc::Sender<T>;
@@ -77,22 +79,22 @@ macro_rules! create_channel {
 
 macro_rules! create_run_func {
 	($func_name: ident, $recv_name: ident, $success_msg: expr) => {
-		fn $func_name($recv_name: R<u8>, timeout: u64) {
-			match $recv_name.recv() {
-				Ok(num) => println!($success_msg, num),
-				Err(e) => println!("{}", e),
+		fn $func_name($recv_name: R<u8>, worker: waitgroup::Worker) {
+			while let Ok(num) = $recv_name.recv() {
+				println!($success_msg, num)
 			}
+			drop(worker);
 		}
 	};
 	($func_name: ident, $recv_name: ident, $send_name: ident, $success_msg: expr) => {
-		fn $func_name($recv_name: R<u8>, $send_name: S<u8>, timeout: u64) {
-			match $recv_name.recv() {
-				Ok(num) => match $send_name.send(num) {
+		fn $func_name($recv_name: R<u8>, $send_name: S<u8>, worker: waitgroup::Worker) {
+			while let Ok(num) = $recv_name.recv() {
+				match $send_name.send(num) {
 					Ok(()) => println!($success_msg, num),
 					Err(e) => println!("{}", e),
-				},
-				Err(e) => println!("{}", e),
+				}
 			}
+			drop(worker);
 		}
 	};
 }
@@ -107,9 +109,51 @@ fn run_checks(t_o: u64, s: Size) -> [Result<(), String>; 5] {
 	]
 }
 
+fn start_coffee_maker(hopper_send: &S<u8>, milk_send: &S<u8>, timeout: u64, customer_id: u8) {
+	if (timeout < 50) {
+		println!("Client {} Start Coffee Timeout!", customer_id);
+	}
+	match hopper_send.send(customer_id) {
+		Ok(()) => println!("Client {} Coffee Beans Started!", customer_id),
+		Err(e) => println!("Error Starting Client {} Coffee Beans!\n{}", customer_id, e),
+	}
+	match milk_send.send(customer_id) {
+		Ok(()) => println!("Client {} Milk Started!", customer_id),
+		Err(e) => println!("Error starting Client {} Milk!\n{}", customer_id, e),
+	}
+}
+
 create_run_func!(grind_coffee, hopper_recv, water_send, "Coffee Ground for Client {}!");
 create_run_func!(dispense_water, water_recv, press_send, "Water Dispensed for Client {}!");
 create_run_func!(press_espresso, press_recv, "Espresso Pressed for Client {}!");
+create_run_func!(heat_milk, milk_recv, froth_send, "Milk heated for Client {}!");
+create_run_func!(froth_milk, froth_recv, "Milk frothed for Client {}!");
+
+async fn do_five_times() {
+	let timeout = 101;
+	let wg = WaitGroup::new();
+	let grind_beans_worker = wg.worker();
+	let dispense_water_worker = wg.worker();
+	let press_espresso_worker = wg.worker();
+	let heat_milk_worker = wg.worker();
+	let froth_milk_worker = wg.worker();
+	create_channel!(grind_send, grind_recv);
+	create_channel!(water_send, water_recv);
+	create_channel!(press_send, press_recv);
+	create_channel!(milk_send, milk_recv);
+	create_channel!(froth_send, froth_recv);
+	thread::spawn(move || grind_coffee(grind_recv, water_send, grind_beans_worker));
+	thread::spawn(move || dispense_water(water_recv, press_send, dispense_water_worker));
+	thread::spawn(move || press_espresso(press_recv, press_espresso_worker));
+	thread::spawn(move || heat_milk(milk_recv, froth_send, heat_milk_worker));
+	thread::spawn(move || froth_milk(froth_recv, froth_milk_worker));
+	for id in 1..5 {
+		start_coffee_maker(&grind_send, &milk_send, timeout, id);
+	}
+	drop(grind_send);
+	drop(milk_send);
+	wg.wait().await;
+}
 
 pub fn message_based_main() {
 	let c = Cup::new(Size::Medium);
@@ -123,13 +167,6 @@ pub fn message_based_main() {
 
 	if passed_checks {
 		// do stuff
-		let timeout = 101;
-		create_channel!(grind_send, grind_recv);
-		create_channel!(water_send, water_recv);
-		create_channel!(press_send, press_recv);
-		create_channel!(milk_send, milk_recv);
-		create_channel!(froth_send, froth_recv);
-		thread::spawn(move || grind_coffee(grind_recv, water_send, timeout));
-		thread::spawn(move || dispense_water(water_recv, press_send, timeout));
+		block_on(do_five_times());
 	}
 }
