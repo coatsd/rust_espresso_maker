@@ -69,7 +69,35 @@ macro_rules! check_machine {
 	};
 }
 
-fn run_checks(t_o: u64, s: Size) -> [Result<(), &'static str>; 5] {
+macro_rules! create_channel {
+	($send_name: ident, $recv_name: ident) => {
+		let ($send_name, $recv_name) = mpsc::channel::<u8>();
+	};
+}
+
+macro_rules! create_run_func {
+	($func_name: ident, $recv_name: ident, $success_msg: expr) => {
+		fn $func_name($recv_name: R<u8>, timeout: u64) {
+			match $recv_name.recv() {
+				Ok(num) => println!($success_msg, num),
+				Err(e) => println!("{}", e),
+			}
+		}
+	};
+	($func_name: ident, $recv_name: ident, $send_name: ident, $success_msg: expr) => {
+		fn $func_name($recv_name: R<u8>, $send_name: S<u8>, timeout: u64) {
+			match $recv_name.recv() {
+				Ok(num) => match $send_name.send(num) {
+					Ok(()) => println!($success_msg, num),
+					Err(e) => println!("{}", e),
+				},
+				Err(e) => println!("{}", e),
+			}
+		}
+	};
+}
+
+fn run_checks(t_o: u64, s: Size) -> [Result<(), String>; 5] {
 	[
 		check_machine!(t_o, s, CoffeeHopper),
 		check_machine!(t_o, s, WaterTank),
@@ -78,6 +106,10 @@ fn run_checks(t_o: u64, s: Size) -> [Result<(), &'static str>; 5] {
 		check_machine!(t_o, Frother)
 	]
 }
+
+create_run_func!(grind_coffee, hopper_recv, water_send, "Coffee Ground for Client {}!");
+create_run_func!(dispense_water, water_recv, press_send, "Water Dispensed for Client {}!");
+create_run_func!(press_espresso, press_recv, "Espresso Pressed for Client {}!");
 
 pub fn message_based_main() {
 	let c = Cup::new(Size::Medium);
@@ -91,5 +123,13 @@ pub fn message_based_main() {
 
 	if passed_checks {
 		// do stuff
+		let timeout = 101;
+		create_channel!(grind_send, grind_recv);
+		create_channel!(water_send, water_recv);
+		create_channel!(press_send, press_recv);
+		create_channel!(milk_send, milk_recv);
+		create_channel!(froth_send, froth_recv);
+		thread::spawn(move || grind_coffee(grind_recv, water_send, timeout));
+		thread::spawn(move || dispense_water(water_recv, press_send, timeout));
 	}
 }

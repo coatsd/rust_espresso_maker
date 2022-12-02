@@ -46,26 +46,26 @@ impl fmt::Display for Size {
 }
 
 pub trait Ping {
-	fn ping(timeout: u64) -> Result<(), &'static str>;
+	fn ping(timeout: u64) -> Result<(), String>;
 }
 pub trait Capacity {
-	fn check_capacity(s: Size) -> Result<(), &'static str>;
+	fn check_capacity(s: Size) -> Result<(), String>;
 }
 
 pub struct CoffeeHopper;
 impl Ping for CoffeeHopper {
-	fn ping(timeout: u64) -> Result<(), &'static str> {
+	fn ping(timeout: u64) -> Result<(), String> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
 		if rng > timeout {
-			Err("CoffeeHopper Component Not Responding")
+			Err("CoffeeHopper Component Not Responding".to_string())
 		} else {
 			Ok(())
 		}
 	}
 }
 impl Capacity for CoffeeHopper {
-	fn check_capacity(s: Size) -> Result<(), &'static str> {
+	fn check_capacity(s: Size) -> Result<(), String> {
 		use Size::*;
 		let s: f32 = match s {
 			Small => 1.0,
@@ -75,17 +75,17 @@ impl Capacity for CoffeeHopper {
 		if s <= BEANAMOUNT {
 			Ok(())	
 		} else {
-			Err("Not enough coffee beans in CoffeeHopper")
+			Err("Not enough coffee beans in CoffeeHopper".to_string())
 		}
 	}
 }
 impl CoffeeHopper {
-	pub fn grind_beans(s: Size, timeout: u64) -> Result<(), &'static str> {
+	pub fn grind_beans(s: Size, timeout: u64) -> Result<(), String> {
 		if let Err(e) = CoffeeHopper::ping(timeout) {
-			return Err(e);
+			return Err(e.to_string());
 		}
 		if let Err(e) = CoffeeHopper::check_capacity(s) {
-			return Err(e);
+			return Err(e.to_string());
 		}
 		Ok(())
 	}
@@ -93,18 +93,18 @@ impl CoffeeHopper {
 
 pub struct WaterTank;
 impl Ping for WaterTank {
-	fn ping(timeout: u64) -> Result<(), &'static str> {
+	fn ping(timeout: u64) -> Result<(), String> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
 		if rng > timeout {
-			Err("WaterTank Component Not Responding")
+			Err("WaterTank Component Not Responding".to_string())
 		} else {
 			Ok(())
 		}
 	}
 }
 impl Capacity for WaterTank {
-	fn check_capacity(s: Size) -> Result<(), &'static str> {
+	fn check_capacity(s: Size) -> Result<(), String> {
 		use Size::*;
 		let s: f32 = match s {
 			Small => 1.0,
@@ -114,17 +114,17 @@ impl Capacity for WaterTank {
 		if s <= WATERAMOUNT {
 			Ok(())	
 		} else {
-			Err("Not enough water in WaterTank")
+			Err("Not enough water in WaterTank".to_string())
 		}
 	}
 }
 impl WaterTank {
-	pub fn dispense(s: Size, timeout: u64) -> Result<(), &'static str> {
+	pub fn dispense(s: Size, timeout: u64) -> Result<(), String> {
 		if let Err(e) = WaterTank::ping(timeout) {
-			return Err(e);
+			return Err(e.to_string());
 		}
 		if let Err(e) = WaterTank::check_capacity(s) {
-			return Err(e);
+			return Err(e.to_string());
 		}
 		Ok(())
 	}
@@ -132,20 +132,20 @@ impl WaterTank {
 
 pub struct EspressoPress;
 impl Ping for EspressoPress {
-	fn ping(timeout: u64) -> Result<(), &'static str> {
+	fn ping(timeout: u64) -> Result<(), String> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
 		if rng > timeout {
-			Err("EspressoPress Component Not Responding")
+			Err("EspressoPress Component Not Responding".to_string())
 		} else {
 			Ok(())
 		}
 	}
 }
 impl EspressoPress {
-	pub fn press(timeout: u64) -> Result<Ingredient, &'static str> {
+	pub fn press(timeout: u64) -> Result<Ingredient, String> {
 		if let Err(e) = EspressoPress::ping(timeout) {
-			return Err(e)
+			return Err(e.to_string())
 		} else {
 			Ok(Ingredient::Espresso)
 		}
@@ -154,18 +154,18 @@ impl EspressoPress {
 
 pub struct MilkTank;
 impl Ping for MilkTank {
-	fn ping(timeout: u64) -> Result<(), &'static str> {
+	fn ping(timeout: u64) -> Result<(), String> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
 		if rng > timeout {
-			Err("MilkTank Component Not Responding")
+			Err("MilkTank Component Not Responding".to_string())
 		} else {
 			Ok(())
 		}
 	}
 }
 impl Capacity for MilkTank {
-	fn check_capacity(s: Size) -> Result<(), &'static str> {
+	fn check_capacity(s: Size) -> Result<(), String> {
 		use Size::*;
 		let s: f32 = match s {
 			Small => 7.0,
@@ -175,17 +175,17 @@ impl Capacity for MilkTank {
 		if s <= MILKAMOUNT {
 			Ok(())
 		} else {
-			Err("Not enough milk in MilkTank")
+			Err("Not enough milk in MilkTank".to_string())
 		}
 	}
 }
 impl MilkTank {
-	pub fn dispense(s: Size, timeout: u64) -> Result<(), &'static str> {
+	pub fn dispense(s: Size, timeout: u64) -> Result<(), String> {
 		if let Err(e) = MilkTank::ping(timeout) {
-			return Err(e);
+			return Err(e.to_string());
 		}
 		if let Err(e) = MilkTank::check_capacity(s) {
-			return Err(e);
+			return Err(e.to_string());
 		}
 		Ok(())
 	}
@@ -193,20 +193,20 @@ impl MilkTank {
 
 pub struct Frother;
 impl Ping for Frother {
-	fn ping(timeout: u64) -> Result<(), &'static str> {
+	fn ping(timeout: u64) -> Result<(), String> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
 		if rng > timeout {
-			Err("Frother Component Not Responding")
+			Err("Frother Component Not Responding".to_string())
 		} else {
 			Ok(())
 		}
 	}
 }
 impl Frother {
-	pub fn froth(timeout: u64) -> Result<Ingredient, &'static str> {
+	pub fn froth(timeout: u64) -> Result<Ingredient, String> {
 		if let Err(e) = Frother::ping(timeout) {
-			return Err(e);
+			return Err(e.to_string());
 		}
 		Ok(Ingredient::Milk)
 	}
