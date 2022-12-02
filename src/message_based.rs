@@ -8,13 +8,14 @@ use std::ops;
 use futures::executor::block_on;
 use crate::machine_components::*;
 
-type S<T> = mpsc::Sender<T>;
-type R<T> = mpsc::Receiver<T>;
+type S<String> = mpsc::Sender<String>;
+type R<String> = mpsc::Receiver<String>;
 
 struct Cup {
 	// size is used to check if there are enough ingredients for order.
 	size: Size,
 	contents: Box<Vec<Ingredient>>,
+	client: String,
 }
 impl fmt::Display for Cup {
 	fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -35,14 +36,16 @@ impl ops::Add<Ingredient> for Cup {
 		Self {
 			size: self.size,
 			contents: c,
+			client: self.client,
 		}
 	}
 }
 impl Cup {
-	fn new(s: Size) -> Self {
+	fn new(s: Size, c: String) -> Self {
 		Cup {
 			size: s,
-			contents: Box::new(Vec::<Ingredient>::new()),	
+			contents: Box::new(Vec::<Ingredient>::new()),
+			client: c,
 		}
 	}
 	fn add_ingredient(mut self, i: Ingredient) {
@@ -73,24 +76,25 @@ macro_rules! check_machine {
 
 macro_rules! create_channel {
 	($send_name: ident, $recv_name: ident) => {
-		let ($send_name, $recv_name) = mpsc::channel::<u8>();
+		let ($send_name, $recv_name) = mpsc::channel::<usize>();
 	};
 }
 
 macro_rules! create_run_func {
 	($func_name: ident, $recv_name: ident, $success_msg: expr) => {
-		fn $func_name($recv_name: R<u8>, worker: waitgroup::Worker) {
-			while let Ok(num) = $recv_name.recv() {
-				println!($success_msg, num)
+		fn $func_name($recv_name: R<usize>, worker: waitgroup::Worker) {
+			while let Ok(name) = $recv_name.recv() {
+				println!($success_msg, name)
 			}
 			drop(worker);
 		}
 	};
 	($func_name: ident, $recv_name: ident, $send_name: ident, $success_msg: expr) => {
-		fn $func_name($recv_name: R<u8>, $send_name: S<u8>, worker: waitgroup::Worker) {
-			while let Ok(num) = $recv_name.recv() {
-				match $send_name.send(num) {
-					Ok(()) => println!($success_msg, num),
+		fn $func_name($recv_name: R<usize>, $send_name: S<usize>, worker: waitgroup::Worker) {
+			while let Ok(name) = $recv_name.recv() {
+				let name_copy = name.clone();
+				match $send_name.send(name) {
+					Ok(()) => println!($success_msg, name_copy),
 					Err(e) => println!("{}", e),
 				}
 			}
@@ -109,17 +113,17 @@ fn run_checks(t_o: u64, s: Size) -> [Result<(), String>; 5] {
 	]
 }
 
-fn start_coffee_maker(hopper_send: &S<u8>, milk_send: &S<u8>, timeout: u64, customer_id: u8) {
-	if (timeout < 50) {
-		println!("Client {} Start Coffee Timeout!", customer_id);
+fn start_coffee_maker(hopper_send: &S<usize>, milk_send: &S<usize>, timeout: u64, client_id: usize) {
+	if timeout < 50 {
+		println!("Client {} Start Coffee Timeout!", client_id);
 	}
-	match hopper_send.send(customer_id) {
-		Ok(()) => println!("Client {} Coffee Beans Started!", customer_id),
-		Err(e) => println!("Error Starting Client {} Coffee Beans!\n{}", customer_id, e),
+	match hopper_send.send(client_id) {
+		Ok(()) => println!("Client {} Coffee Beans Started!", client_id),
+		Err(e) => println!("Error Starting Client {} Coffee Beans!\n{}", client_id, e),
 	}
-	match milk_send.send(customer_id) {
-		Ok(()) => println!("Client {} Milk Started!", customer_id),
-		Err(e) => println!("Error starting Client {} Milk!\n{}", customer_id, e),
+	match milk_send.send(client_id) {
+		Ok(()) => println!("Client {} Milk Started!", client_id),
+		Err(e) => println!("Error starting Client {} Milk!\n{}", client_id, e),
 	}
 }
 
@@ -142,13 +146,30 @@ async fn do_five_times() {
 	create_channel!(press_send, press_recv);
 	create_channel!(milk_send, milk_recv);
 	create_channel!(froth_send, froth_recv);
+	let cups = ["Josh", "Sharon", "Moobly", "Tosh", "Mary"]
+		.map(|name| { return Cup::new(Size::Medium, name.to_string()); });
+
 	thread::spawn(move || grind_coffee(grind_recv, water_send, grind_beans_worker));
 	thread::spawn(move || dispense_water(water_recv, press_send, dispense_water_worker));
 	thread::spawn(move || press_espresso(press_recv, press_espresso_worker));
 	thread::spawn(move || heat_milk(milk_recv, froth_send, heat_milk_worker));
 	thread::spawn(move || froth_milk(froth_recv, froth_milk_worker));
-	for id in 1..5 {
-		start_coffee_maker(&grind_send, &milk_send, timeout, id);
+	for (id, cup) in cups.iter().enumerate() {
+		let mut passed = true;
+		for check in run_checks(timeout, cup.size) {
+			match check {
+				Err(e) => {
+					passed = false;
+					println!("{}", e);
+				},
+				_ => (),
+			}
+		}
+		if passed {
+			start_coffee_maker(&grind_send, &milk_send, timeout, id);
+		} else {
+			println!("Cannot make {}'s Coffee!", cup.client);
+		}
 	}
 	drop(grind_send);
 	drop(milk_send);
@@ -156,17 +177,6 @@ async fn do_five_times() {
 }
 
 pub fn message_based_main() {
-	let c = Cup::new(Size::Medium);
-	let mut passed_checks = true;
-	for check in run_checks(100, c.size).iter() {
-		match check {
-			Err(e) => { passed_checks = false; println!("{}", e); },
-			_ => println!("Passed!"),
-		}
-	}
-
-	if passed_checks {
-		// do stuff
-		block_on(do_five_times());
-	}
+	// do stuff
+	block_on(do_five_times());
 }
