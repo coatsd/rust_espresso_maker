@@ -1,4 +1,4 @@
-use std::{time, thread};
+use std::thread;
 use waitgroup::WaitGroup;
 use std::sync::mpsc;
 use std::fmt;
@@ -8,8 +8,9 @@ use std::ops;
 use futures::executor::block_on;
 use crate::machine_components::*;
 
-type S<String> = mpsc::Sender<String>;
-type R<String> = mpsc::Receiver<String>;
+type S<T> = mpsc::Sender<T>;
+type R<T> = mpsc::Receiver<T>;
+const TIMEOUT: u64 = 101;
 
 struct Cup {
 	// size is used to check if there are enough ingredients for order.
@@ -80,22 +81,27 @@ macro_rules! create_channel {
 	};
 }
 
-macro_rules! create_run_func {
-	($func_name: ident, $recv_name: ident, $success_msg: expr) => {
+macro_rules! create_pipeline {
+	($func_name: ident, $recv_name: ident, $component: ty, $timeout: expr, $success_msg: expr) => {
 		fn $func_name($recv_name: R<usize>, worker: waitgroup::Worker) {
 			while let Ok(name) = $recv_name.recv() {
-				println!($success_msg, name)
+				match <$component>::exec_job($timeout) {
+					Err(e) => println!("{}", e),
+					_ => println!($success_msg, name),
+				}
 			}
 			drop(worker);
 		}
 	};
-	($func_name: ident, $recv_name: ident, $send_name: ident, $success_msg: expr) => {
+	($func_name: ident, $recv_name: ident, $send_name: ident, $component: ty, $timeout: expr, $success_msg: expr) => {
 		fn $func_name($recv_name: R<usize>, $send_name: S<usize>, worker: waitgroup::Worker) {
 			while let Ok(name) = $recv_name.recv() {
-				let name_copy = name.clone();
-				match $send_name.send(name) {
-					Ok(()) => println!($success_msg, name_copy),
+				match <$component>::exec_job($timeout) {
 					Err(e) => println!("{}", e),
+					_ => match $send_name.send(name) {
+						Ok(()) => println!($success_msg, name),
+						Err(e) => println!("{}", e),
+					}
 				}
 			}
 			drop(worker);
@@ -127,14 +133,13 @@ fn start_coffee_maker(hopper_send: &S<usize>, milk_send: &S<usize>, timeout: u64
 	}
 }
 
-create_run_func!(grind_coffee, hopper_recv, water_send, "Coffee Ground for Client {}!");
-create_run_func!(dispense_water, water_recv, press_send, "Water Dispensed for Client {}!");
-create_run_func!(press_espresso, press_recv, "Espresso Pressed for Client {}!");
-create_run_func!(heat_milk, milk_recv, froth_send, "Milk heated for Client {}!");
-create_run_func!(froth_milk, froth_recv, "Milk frothed for Client {}!");
+create_pipeline!(grind_coffee, hopper_recv, water_send, CoffeeHopper, TIMEOUT, "Coffee Ground for Client {}!");
+create_pipeline!(dispense_water, water_recv, press_send, WaterTank, TIMEOUT, "Water Dispensed for Client {}!");
+create_pipeline!(press_espresso, press_recv, EspressoPress, TIMEOUT, "Espresso Pressed for Client {}!");
+create_pipeline!(heat_milk, milk_recv, froth_send, MilkTank, TIMEOUT, "Milk heated for Client {}!");
+create_pipeline!(froth_milk, froth_recv, Frother, TIMEOUT, "Milk frothed for Client {}!");
 
 async fn do_five_times() {
-	let timeout = 101;
 	let wg = WaitGroup::new();
 	let grind_beans_worker = wg.worker();
 	let dispense_water_worker = wg.worker();
@@ -156,7 +161,7 @@ async fn do_five_times() {
 	thread::spawn(move || froth_milk(froth_recv, froth_milk_worker));
 	for (id, cup) in cups.iter().enumerate() {
 		let mut passed = true;
-		for check in run_checks(timeout, cup.size) {
+		for check in run_checks(TIMEOUT, cup.size) {
 			match check {
 				Err(e) => {
 					passed = false;
@@ -166,7 +171,7 @@ async fn do_five_times() {
 			}
 		}
 		if passed {
-			start_coffee_maker(&grind_send, &milk_send, timeout, id);
+			start_coffee_maker(&grind_send, &milk_send, TIMEOUT, id);
 		} else {
 			println!("Cannot make {}'s Coffee!", cup.client);
 		}
