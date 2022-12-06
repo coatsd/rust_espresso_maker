@@ -10,7 +10,7 @@ use crate::machine_components::*;
 
 type S<T> = mpsc::Sender<T>;
 type R<T> = mpsc::Receiver<T>;
-const TIMEOUT: u64 = 101;
+const TIMEOUT: usize = 101;
 
 struct Cup {
 	// size is used to check if there are enough ingredients for order.
@@ -77,29 +77,29 @@ macro_rules! check_machine {
 
 macro_rules! create_channel {
 	($send_name: ident, $recv_name: ident) => {
-		let ($send_name, $recv_name) = mpsc::channel::<usize>();
+		let ($send_name, $recv_name) = mpsc::channel::<(usize, Option<Size>)>();
 	};
 }
 
 macro_rules! create_pipeline {
 	($func_name: ident, $recv_name: ident, $component: ty, $timeout: expr, $success_msg: expr) => {
-		fn $func_name($recv_name: R<usize>, worker: waitgroup::Worker) {
-			while let Ok(name) = $recv_name.recv() {
-				match <$component>::exec_job($timeout) {
+		fn $func_name($recv_name: R<(usize, Option<Size>)>, worker: waitgroup::Worker) {
+			while let Ok((cup_id, size)) = $recv_name.recv() {
+				match <$component>::exec_job($timeout, size) {
 					Err(e) => println!("{}", e),
-					_ => println!($success_msg, name),
+					_ => println!($success_msg, cup_id),
 				}
 			}
 			drop(worker);
 		}
 	};
 	($func_name: ident, $recv_name: ident, $send_name: ident, $component: ty, $timeout: expr, $success_msg: expr) => {
-		fn $func_name($recv_name: R<usize>, $send_name: S<usize>, worker: waitgroup::Worker) {
-			while let Ok(name) = $recv_name.recv() {
-				match <$component>::exec_job($timeout) {
+		fn $func_name($recv_name: R<(usize, Option<Size>)>, $send_name: S<(usize, Option<Size>)>, worker: waitgroup::Worker) {
+			while let Ok((cup_id, size)) = $recv_name.recv() {
+				match <$component>::exec_job($timeout, size) {
 					Err(e) => println!("{}", e),
-					_ => match $send_name.send(name) {
-						Ok(()) => println!($success_msg, name),
+					_ => match $send_name.send((cup_id, size)) {
+						Ok(()) => println!($success_msg, cup_id),
 						Err(e) => println!("{}", e),
 					}
 				}
@@ -109,7 +109,7 @@ macro_rules! create_pipeline {
 	};
 }
 
-fn run_checks(t_o: u64, s: Size) -> [Result<(), String>; 5] {
+fn run_checks(t_o: usize, s: Size) -> [Result<(), String>; 5] {
 	[
 		check_machine!(t_o, s, CoffeeHopper),
 		check_machine!(t_o, s, WaterTank),
@@ -119,15 +119,15 @@ fn run_checks(t_o: u64, s: Size) -> [Result<(), String>; 5] {
 	]
 }
 
-fn start_coffee_maker(hopper_send: &S<usize>, milk_send: &S<usize>, timeout: u64, client_id: usize) {
+fn start_coffee_maker(hopper_send: &S<(usize, Option<Size>)>, milk_send: &S<(usize, Option<Size>)>, timeout: usize, client_id: usize, size: Size) {
 	if timeout < 50 {
 		println!("Client {} Start Coffee Timeout!", client_id);
 	}
-	match hopper_send.send(client_id) {
+	match hopper_send.send((client_id, Option::Some(size))) {
 		Ok(()) => println!("Client {} Coffee Beans Started!", client_id),
 		Err(e) => println!("Error Starting Client {} Coffee Beans!\n{}", client_id, e),
 	}
-	match milk_send.send(client_id) {
+	match milk_send.send((client_id, Option::Some(size))) {
 		Ok(()) => println!("Client {} Milk Started!", client_id),
 		Err(e) => println!("Error starting Client {} Milk!\n{}", client_id, e),
 	}
@@ -171,7 +171,7 @@ async fn do_five_times() {
 			}
 		}
 		if passed {
-			start_coffee_maker(&grind_send, &milk_send, TIMEOUT, id);
+			start_coffee_maker(&grind_send, &milk_send, TIMEOUT, id, cup.size);
 		} else {
 			println!("Cannot make {}'s Coffee!", cup.client);
 		}

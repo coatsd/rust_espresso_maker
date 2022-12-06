@@ -46,22 +46,22 @@ impl fmt::Display for Size {
 }
 
 pub trait Ping {
-	fn ping(timeout: u64) -> Result<(), String>;
+	fn ping(timeout: usize) -> Result<(), String>;
 }
 pub trait Capacity {
 	fn check_capacity(s: Size) -> Result<(), String>;
 }
 
 pub trait ExecJob {
-	fn exec_job(timeout: u64) -> Result<(), String>;
+	fn exec_job(timeout: usize, size: Option<Size>) -> Result<(), String>;
 }
 
 pub struct CoffeeHopper;
 impl Ping for CoffeeHopper {
-	fn ping(timeout: u64) -> Result<(), String> {
+	fn ping(timeout: usize) -> Result<(), String> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
-		if rng > timeout {
+		if rng as usize > timeout {
 			Err("CoffeeHopper Component Not Responding".to_string())
 		} else {
 			Ok(())
@@ -83,21 +83,34 @@ impl Capacity for CoffeeHopper {
 		}
 	}
 }
-impl ExecJob for CoffeeHopper {
-	fn exec_job(timeout: u64) -> Result<(), String> {
+impl CoffeeHopper {
+	fn grind_beans(timeout: usize, size: Option<Size>) -> Result<(), String> {
 		if let Err(e) = CoffeeHopper::ping(timeout) {
 			return Err(e.to_string());
 		}
+		match size {
+			Some(s) => {
+				if let Err(e) = CoffeeHopper::check_capacity(s) {
+					return Err(e.to_string());
+				}
+			},
+			None => (),
+		}
 		Ok(())
+	}
+}
+impl ExecJob for CoffeeHopper {
+	fn exec_job(timeout: usize, size: Option<Size>) -> Result<(), String> {
+		CoffeeHopper::grind_beans(timeout, size)
 	}
 }
 
 pub struct WaterTank;
 impl Ping for WaterTank {
-	fn ping(timeout: u64) -> Result<(), String> {
+	fn ping(timeout: usize) -> Result<(), String> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
-		if rng > timeout {
+		if rng as usize > timeout {
 			Err("WaterTank Component Not Responding".to_string())
 		} else {
 			Ok(())
@@ -119,43 +132,60 @@ impl Capacity for WaterTank {
 		}
 	}
 }
-impl ExecJob for WaterTank {
-	fn exec_job(timeout: u64) -> Result<(), String> {
+impl WaterTank {
+	fn dispense(timeout: usize, size: Option<Size>) -> Result<(), String> {
 		if let Err(e) = WaterTank::ping(timeout) {
 			return Err(e.to_string());
 		}
+		match size {
+			Some(s) => {
+				if let Err(e) = WaterTank::check_capacity(s) {
+					return Err(e.to_string());
+				}
+			},
+			None => (),
+		}
 		Ok(())
+	}
+}
+impl ExecJob for WaterTank {
+	fn exec_job(timeout: usize, size: Option<Size>) -> Result<(), String> {
+		WaterTank::dispense(timeout, size)
 	}
 }
 
 pub struct EspressoPress;
 impl Ping for EspressoPress {
-	fn ping(timeout: u64) -> Result<(), String> {
+	fn ping(timeout: usize) -> Result<(), String> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
-		if rng > timeout {
+		if rng as usize > timeout {
 			Err("EspressoPress Component Not Responding".to_string())
 		} else {
 			Ok(())
 		}
 	}
 }
-impl ExecJob for EspressoPress {
-	fn exec_job(timeout: u64) -> Result<(), String> {
+impl EspressoPress {
+	fn press(timeout: usize) -> Result<(), String> {
 		if let Err(e) = EspressoPress::ping(timeout) {
 			return Err(e.to_string())
-		} else {
-			Ok(())
 		}
+		Ok(())
+	}
+}
+impl ExecJob for EspressoPress {
+	fn exec_job(timeout: usize, _: Option<Size>) -> Result<(), String> {
+		EspressoPress::press(timeout)
 	}
 }
 
 pub struct MilkTank;
 impl Ping for MilkTank {
-	fn ping(timeout: u64) -> Result<(), String> {
+	fn ping(timeout: usize) -> Result<(), String> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
-		if rng > timeout {
+		if rng as usize > timeout {
 			Err("MilkTank Component Not Responding".to_string())
 		} else {
 			Ok(())
@@ -177,32 +207,48 @@ impl Capacity for MilkTank {
 		}
 	}
 }
-impl ExecJob for MilkTank {
-	fn exec_job(timeout: u64) -> Result<(), String> {
+impl MilkTank {
+	fn dispense(timeout: usize, size: Option<Size>) -> Result<(), String> {
 		if let Err(e) = MilkTank::ping(timeout) {
 			return Err(e.to_string());
 		}
+		match size {
+			Some(s) => if let Err(e) = MilkTank::check_capacity(s) {
+				return Err(e.to_string());
+			},
+			None => (),
+		}
 		Ok(())
+	}
+}
+impl ExecJob for MilkTank {
+	fn exec_job(timeout: usize, size: Option<Size>) -> Result<(), String> {
+		MilkTank::dispense(timeout, size)
 	}
 }
 
 pub struct Frother;
 impl Ping for Frother {
-	fn ping(timeout: u64) -> Result<(), String> {
+	fn ping(timeout: usize) -> Result<(), String> {
 		let rng = thread_rng().gen_range(2..100);
 		thread::sleep(time::Duration::from_millis(rng));
-		if rng > timeout {
+		if rng as usize > timeout {
 			Err("Frother Component Not Responding".to_string())
 		} else {
 			Ok(())
 		}
 	}
 }
-impl ExecJob for Frother {
-	fn exec_job(timeout: u64) -> Result<(), String> {
+impl Frother {
+	fn froth(timeout: usize) -> Result<(), String> {
 		if let Err(e) = Frother::ping(timeout) {
 			return Err(e.to_string());
 		}
 		Ok(())
+	}
+}
+impl ExecJob for Frother {
+	fn exec_job(timeout: usize, _: Option<Size>) -> Result<(), String> {
+		Frother::froth(timeout)
 	}
 }
