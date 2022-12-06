@@ -154,11 +154,24 @@ async fn do_five_times() {
 	let cups = ["Josh", "Sharon", "Moobly", "Tosh", "Mary"]
 		.map(|name| { return Cup::new(Size::Medium, name.to_string()); });
 
-	thread::spawn(move || grind_coffee(grind_recv, water_send, grind_beans_worker));
-	thread::spawn(move || dispense_water(water_recv, press_send, dispense_water_worker));
-	thread::spawn(move || press_espresso(press_recv, press_espresso_worker));
-	thread::spawn(move || heat_milk(milk_recv, froth_send, heat_milk_worker));
-	thread::spawn(move || froth_milk(froth_recv, froth_milk_worker));
+	let threads = vec![
+		thread::spawn(move || grind_coffee(grind_recv, water_send, grind_beans_worker)),
+		thread::spawn(move || dispense_water(water_recv, press_send, dispense_water_worker)),
+		thread::spawn(move || press_espresso(press_recv, press_espresso_worker)),
+		thread::spawn(move || heat_milk(milk_recv, froth_send, heat_milk_worker)),
+		thread::spawn(move || froth_milk(froth_recv, froth_milk_worker)),
+	];
+
+	for t in threads {
+		if let Err(e) = t.join() {
+			if let Some(e) = e.downcast_ref::<&'static str>() {
+				println!("Error starting thread: {}", e);
+			} else {
+				println!("Unknown Error starting thread: {:?}", e);
+			}
+		}
+	}
+
 	for (id, cup) in cups.iter().enumerate() {
 		let mut passed = true;
 		for check in run_checks(TIMEOUT, cup.size) {
