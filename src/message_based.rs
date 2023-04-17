@@ -131,7 +131,7 @@ macro_rules! create_channel {
 /// 2f. An expression that represents a string that will be printed as a
 /// success message. Can pass in a template to print out the cup ID.<br>
 macro_rules! create_pipeline {
-	($func_name: ident, $recv_name: ident, $component: ty, $timeout: expr, $success_msg: expr) => {
+	($func_name: ident <$component: ty> ($recv_name: ident), $timeout: expr, $success_msg: expr) => {
 		fn $func_name($recv_name: R<ChannelData>, worker: waitgroup::Worker) {
 			while let Ok((cup_id, size)) = $recv_name.recv() {
 				match <$component>::exec_job($timeout, size) {
@@ -142,7 +142,7 @@ macro_rules! create_pipeline {
 			drop(worker);
 		}
 	};
-	($func_name: ident, $recv_name: ident, $send_name: ident, $component: ty, $timeout: expr, $success_msg: expr) => {
+	($func_name: ident <$component: ty> ($recv_name: ident, $send_name: ident), $timeout: expr, $success_msg: expr) => {
 		fn $func_name($recv_name: R<ChannelData>, $send_name: S<ChannelData>, worker: waitgroup::Worker) {
 			while let Ok((cup_id, size)) = $recv_name.recv() {
 				match <$component>::exec_job($timeout, size) {
@@ -182,11 +182,11 @@ fn start_coffee_maker(hopper_send: &S<ChannelData>, milk_send: &S<ChannelData>, 
 	}
 }
 
-create_pipeline!(grind_coffee, hopper_recv, water_send, CoffeeHopper, TIMEOUT, "Coffee Ground for Client {}!");
-create_pipeline!(dispense_water, water_recv, press_send, WaterTank, TIMEOUT, "Water Dispensed for Client {}!");
-create_pipeline!(press_espresso, press_recv, EspressoPress, TIMEOUT, "Espresso Pressed for Client {}!");
-create_pipeline!(heat_milk, milk_recv, froth_send, MilkTank, TIMEOUT, "Milk heated for Client {}!");
-create_pipeline!(froth_milk, froth_recv, Frother, TIMEOUT, "Milk frothed for Client {}!");
+create_pipeline!(grind_coffee<CoffeeHopper>(hopper_recv, water_send), TIMEOUT, "Coffee Ground for Client {}!");
+create_pipeline!(dispense_water<WaterTank>(water_recv, press_send), TIMEOUT, "Water Dispensed for Client {}!");
+create_pipeline!(press_espresso<EspressoPress>(press_recv), TIMEOUT, "Espresso Pressed for Client {}!");
+create_pipeline!(heat_milk<MilkTank>(milk_recv, froth_send), TIMEOUT, "Milk heated for Client {}!");
+create_pipeline!(froth_milk<Frother>(froth_recv), TIMEOUT, "Milk frothed for Client {}!");
 
 async fn do_five_times() {
 	// create a workgroup that will generate workers that will be passed to
