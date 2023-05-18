@@ -75,14 +75,14 @@ impl Cup {
 /// 2c. A type that represents the machine component that implements the Ping
 /// interface and it's associated functions.
 macro_rules! check_machine {
-	($t_o:expr, $m:ty) => {
+	(<$m:ty>::($t_o:expr)) => {
 		if let Result::Err(e) = <$m>::ping($t_o) {
 			Err(e)
 		} else {
 			Ok(())
 		}
 	};
-	($t_o:expr, $s:expr, $m:ty) => {
+	(<$m:ty>::($t_o:expr, $s:expr)) => {
 		if let Result::Err(e) = <$m>::ping($t_o) {
 			Err(e)
 		} else {
@@ -131,7 +131,7 @@ macro_rules! create_channel {
 /// 2f. An expression that represents a string that will be printed as a
 /// success message. Can pass in a template to print out the cup ID.<br>
 macro_rules! create_pipeline {
-	($func_name: ident <$component: ty> ($recv_name: ident), $timeout: expr, $success_msg: expr) => {
+	($func_name: ident <$component: ty> ($recv_name: ident) { $timeout: expr, $success_msg: expr }) => {
 		fn $func_name($recv_name: R<ChannelData>, worker: waitgroup::Worker) {
 			while let Ok((cup_id, size)) = $recv_name.recv() {
 				match <$component>::exec_job($timeout, size) {
@@ -142,7 +142,7 @@ macro_rules! create_pipeline {
 			drop(worker);
 		}
 	};
-	($func_name: ident <$component: ty> ($recv_name: ident, $send_name: ident), $timeout: expr, $success_msg: expr) => {
+	($func_name: ident <$component: ty> ($recv_name: ident, $send_name: ident) { $timeout: expr, $success_msg: expr }) => {
 		fn $func_name($recv_name: R<ChannelData>, $send_name: S<ChannelData>, worker: waitgroup::Worker) {
 			while let Ok((cup_id, size)) = $recv_name.recv() {
 				match <$component>::exec_job($timeout, size) {
@@ -160,11 +160,11 @@ macro_rules! create_pipeline {
 
 fn run_checks(t_o: usize, s: Size) -> [Result<(), String>; 5] {
 	[
-		check_machine!(t_o, s, CoffeeHopper),
-		check_machine!(t_o, s, WaterTank),
-		check_machine!(t_o, EspressoPress),
-		check_machine!(t_o, s, MilkTank),
-		check_machine!(t_o, Frother)
+		check_machine!(<CoffeeHopper>::(t_o, s)),
+		check_machine!(<WaterTank>::(t_o, s)),
+		check_machine!(<EspressoPress>::(t_o)),
+		check_machine!(<MilkTank>::(t_o, s)),
+		check_machine!(<Frother>::(t_o))
 	]
 }
 
@@ -182,11 +182,11 @@ fn start_coffee_maker(hopper_send: &S<ChannelData>, milk_send: &S<ChannelData>, 
 	}
 }
 
-create_pipeline!(grind_coffee<CoffeeHopper>(hopper_recv, water_send), TIMEOUT, "Coffee Ground for Client {}!");
-create_pipeline!(dispense_water<WaterTank>(water_recv, press_send), TIMEOUT, "Water Dispensed for Client {}!");
-create_pipeline!(press_espresso<EspressoPress>(press_recv), TIMEOUT, "Espresso Pressed for Client {}!");
-create_pipeline!(heat_milk<MilkTank>(milk_recv, froth_send), TIMEOUT, "Milk heated for Client {}!");
-create_pipeline!(froth_milk<Frother>(froth_recv), TIMEOUT, "Milk frothed for Client {}!");
+create_pipeline!(grind_coffee<CoffeeHopper>(hopper_recv, water_send) { TIMEOUT, "Coffee Ground for Client {}!" });
+create_pipeline!(dispense_water<WaterTank>(water_recv, press_send) { TIMEOUT, "Water Dispensed for Client {}!" });
+create_pipeline!(press_espresso<EspressoPress>(press_recv) { TIMEOUT, "Espresso Pressed for Client {}!" });
+create_pipeline!(heat_milk<MilkTank>(milk_recv, froth_send) { TIMEOUT, "Milk heated for Client {}!" });
+create_pipeline!(froth_milk<Frother>(froth_recv) { TIMEOUT, "Milk frothed for Client {}!" });
 
 async fn do_five_times() {
 	// create a workgroup that will generate workers that will be passed to
